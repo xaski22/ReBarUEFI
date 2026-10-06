@@ -6,23 +6,40 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential uuid-dev python3 nasm iasl git
 
-      - name: Run build script
-        run: |
-          chmod +x buildffs.sh
-          ./buildffs.sh
+      - name: Checkout EDK2
+        uses: actions/checkout@v4
+        with:
+          repository: tianocore/edk2
+          ref: edk2-stable202302
+          path: workspace/edk2
+          submodules: recursive
+          depth: 1
 
-      - name: Find and Upload ReBarDxe EFI
+      - name: Checkout ReBarUEFI
+        uses: actions/checkout@v4
+        with:
+          path: workspace/ReBarUEFI
+
+      - name: Compile BaseTools
+        run: |
+          make -C workspace/edk2/BaseTools -j$(nproc)
+
+      - name: Build ReBarDxe.efi
+        run: |
+          cd workspace/edk2
+          export WORKSPACE=$GITHUB_WORKSPACE/workspace
+          export PACKAGES_PATH=$GITHUB_WORKSPACE/workspace/edk2:$GITHUB_WORKSPACE/workspace
+          export EDK_TOOLS_PATH=$GITHUB_WORKSPACE/workspace/edk2/BaseTools
+          source edksetup.sh BaseTools
+          build -p $GITHUB_WORKSPACE/workspace/ReBarUEFI/ReBarUEFI.dsc -a X64 -b RELEASE -t GCC5
+
+      - name: Upload ReBarDxe.efi
         uses: actions/upload-artifact@v4
         with:
           name: ReBarDxe-EFI
-          path: |
-            edk2/Build/**/ReBarDxe.efi
-            **/ReBarDxe.efi
+          path: workspace/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
