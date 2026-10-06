@@ -1,0 +1,34 @@
+name: Build ReBarDxe EFI
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential uuid-dev python3 nasm iasl
+
+      - name: Checkout EDK2
+        run: |
+          git clone --depth 1 --recurse-submodules https://github.com/tianocore/edk2.git
+
+      - name: Checkout ReBarUEFI
+        run: |
+          cd edk2
+          git clone https://github.com/xCuri0/ReBarUEFI.git
+
+      - name: Compile ReBarDxe
+        run: |
+          cd edk2
+          make -C BaseTools
+          source edksetup.sh
+          build -p ReBarUEFI/ReBarUEFI.dsc -a X64 -t GCC5 -b RELEASE
+
+      - name: Upload ReBarDxe.efi
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReBarDxe-EFI
+          path: edk2/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
