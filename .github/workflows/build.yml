@@ -4,31 +4,43 @@ on: [push, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
+      - name: Checkout ReBarUEFI
+        uses: actions/checkout@v4
+        with:
+          path: ReBarUEFI
+
+      - name: Checkout EDK2
+        uses: actions/checkout@v4
+        with:
+          repository: tianocore/edk2
+          path: edk2
+          submodules: recursive
+          depth: 1
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git build-essential uuid-dev python3 nasm iasl
+          sudo apt-get install -y build-essential uuid-dev python3 nasm iasl
 
-      - name: Checkout EDK2
+      - name: Compile BaseTools
         run: |
-          git clone --depth 1 --recurse-submodules https://github.com/tianocore/edk2.git
+          make -C edk2/BaseTools -j$(nproc)
 
-      - name: Checkout ReBarUEFI
-        run: |
-          cd edk2
-          git clone https://github.com/xCuri0/ReBarUEFI.git
-
-      - name: Compile ReBarDxe
+      - name: Build ReBarDxe.efi
         run: |
           cd edk2
-          make -C BaseTools
-          source edksetup.sh
-          build -p ReBarUEFI/ReBarUEFI.dsc -a X64 -t GCC5 -b RELEASE
+          export EDK_TOOLS_PATH=$PWD/BaseTools
+          export CONF_PATH=$PWD/Conf
+          export PACKAGES_PATH=$PWD:$PWD/../ReBarUEFI
+          source edksetup.sh BaseTools
+          build -p ../ReBarUEFI/ReBarUEFI.dsc -a X64 -b RELEASE -t GCC5 -m ../ReBarUEFI/ReBarDxe/ReBarDxe.inf
 
       - name: Upload ReBarDxe.efi
         uses: actions/upload-artifact@v4
         with:
           name: ReBarDxe-EFI
-          path: edk2/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
+          path: |
+            edk2/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
+            edk2/Build/**/ReBarDxe.efi
