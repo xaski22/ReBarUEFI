@@ -9,12 +9,13 @@ jobs:
       - name: Checkout ReBarUEFI
         uses: actions/checkout@v4
         with:
-          path: ReBarUEFI
+          path: ReBarUEFI-src
 
       - name: Checkout EDK2
         uses: actions/checkout@v4
         with:
           repository: tianocore/edk2
+          ref: edk2-stable202302
           path: edk2
           submodules: recursive
           depth: 1
@@ -22,7 +23,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential uuid-dev python3 nasm iasl
+          sudo apt-get install -y build-essential uuid-dev python3 nasm iasl git
+
+      - name: Setup folder structure
+        run: |
+          # ReBarUEFI должен быть физически внутри edk2
+          cp -r ReBarUEFI-src edk2/ReBarUEFI
 
       - name: Compile BaseTools
         run: |
@@ -31,16 +37,14 @@ jobs:
       - name: Build ReBarDxe.efi
         run: |
           cd edk2
+          export WORKSPACE=$PWD
+          export PACKAGES_PATH=$PWD
           export EDK_TOOLS_PATH=$PWD/BaseTools
-          export CONF_PATH=$PWD/Conf
-          export PACKAGES_PATH=$PWD:$PWD/../ReBarUEFI
           source edksetup.sh BaseTools
-          build -p ../ReBarUEFI/ReBarUEFI.dsc -a X64 -b RELEASE -t GCC5 -m ../ReBarUEFI/ReBarDxe/ReBarDxe.inf
+          build -p ReBarUEFI/ReBarUEFI.dsc -a X64 -b RELEASE -t GCC5
 
       - name: Upload ReBarDxe.efi
         uses: actions/upload-artifact@v4
         with:
           name: ReBarDxe-EFI
-          path: |
-            edk2/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
-            edk2/Build/**/ReBarDxe.efi
+          path: edk2/Build/ReBarUEFI/RELEASE_GCC5/X64/ReBarDxe.efi
